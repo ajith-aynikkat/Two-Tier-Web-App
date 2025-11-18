@@ -1,4 +1,3 @@
-# backend/app.py
 from flask import Flask, request, jsonify, g
 import os
 import mysql.connector
@@ -10,7 +9,7 @@ from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
-# Config (envs with sensible defaults)
+# Config
 DB_HOST = os.getenv("MYSQL_HOST", "db")
 DB_USER = os.getenv("MYSQL_USER", "user")
 DB_PASS = os.getenv("MYSQL_PASSWORD", "password")
@@ -19,7 +18,7 @@ JWT_SECRET = os.getenv("JWT_SECRET", "change-this-secret")
 JWT_ALGORITHM = "HS256"
 JWT_EXP_DELTA_SECONDS = int(os.getenv("JWT_EXP_SECONDS", 3600))
 
-# Setup a connection pool for efficiency
+# DB Pool
 POOL_NAME = "mypool"
 POOL_SIZE = int(os.getenv("DB_POOL_SIZE", 5))
 try:
@@ -35,10 +34,12 @@ except Exception as e:
     app.logger.error("Failed to create DB pool: %s", e)
     cnxpool = None
 
+
 def get_db_connection():
     if cnxpool is None:
         raise Error("DB pool not initialized")
     return cnxpool.get_connection()
+
 
 def log_action(user_id, action):
     try:
@@ -55,14 +56,16 @@ def log_action(user_id, action):
         except:
             pass
 
+
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
-        # expect Authorization: Bearer <token>
         auth = request.headers.get("Authorization", None)
+
         if auth and auth.startswith("Bearer "):
             token = auth.split(" ", 1)[1].strip()
+
         if not token:
             return jsonify({"error": "Token is missing"}), 401
         try:
@@ -73,17 +76,22 @@ def token_required(f):
         except Exception as e:
             app.logger.error("JWT decode error: %s", e)
             return jsonify({"error": "Token is invalid"}), 401
+
         return f(*args, **kwargs)
+
     return decorated
+
 
 @app.route("/")
 def index():
     return jsonify({"status": "ok", "message": "Two-Tier Web App (Flask)"}), 200
 
-# Register - creates user with hashed password
+
+# ---------------- REGISTER ----------------
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json(silent=True) or {}
+
     name = (data.get("name") or "").strip()
     email = (data.get("email") or "").strip()
     phone = (data.get("phone") or "").strip()
@@ -103,58 +111,64 @@ def register():
         )
         conn.commit()
         user_id = cursor.lastrowid
+
         log_action(user_id, "register")
         return jsonify({"status": "created", "id": user_id, "name": name, "email": email}), 201
     except Error as e:
-        app.logger.error("Register error: %s", e)
         return jsonify({"error": str(e)}), 500
     finally:
         try:
-            cursor.close(); conn.close()
+            cursor.close()
+            conn.close()
         except:
             pass
 
-# Login - returns JWT
+
+# ---------------- LOGIN ----------------
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json(silent=True) or {}
+
     email = (data.get("email") or "").strip()
     password = data.get("password") or ""
+
     if not email or not password:
         return jsonify({"error": "email and password required"}), 400
+
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         cursor.execute("SELECT id, name, password_hash FROM users WHERE email=%s LIMIT 1", (email,))
         row = cursor.fetchone()
-        if not row:
-            return jsonify({"error": "invalid credentials"}), 401
-        if not check_password_hash(row["password_hash"], password):
+
+        if not row or not check_password_hash(row["password_hash"], password):
             return jsonify({"error": "invalid credentials"}), 401
 
         payload = {
             "user_id": row["id"],
             "name": row["name"],
-            "exp": datetime.utcnow() + timedelta(seconds=JWT_EXP_DELTA_SECONDS)
+            "exp": datetime.utcnow() + timedelta(seconds=JWT_EXP_DELTA_SECONDS),
         }
         token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
         return jsonify({"token": token, "user": {"id": row["id"], "name": row["name"]}})
     except Error as e:
-        app.logger.error("Login error: %s", e)
         return jsonify({"error": str(e)}), 500
     finally:
         try:
-            cursor.close(); conn.close()
+            cursor.close()
+            conn.close()
         except:
             pass
 
-# Example protected route
+
 @app.route("/profile", methods=["GET"])
 @token_required
 def profile():
     return jsonify({"user": g.current_user}), 200
 
-# Get single user
+
+# ---------------- GET USER ----------------
 @app.route("/user/<int:user_id>", methods=["GET"])
 def get_user(user_id):
     try:
@@ -162,54 +176,69 @@ def get_user(user_id):
         cursor = conn.cursor(dictionary=True)
         cursor.execute("SELECT id, name, email, phone, created_at FROM users WHERE id=%s", (user_id,))
         row = cursor.fetchone()
+
         if not row:
             return jsonify({"error": "user not found"}), 404
+
         return jsonify(row)
     except Error as e:
-        app.logger.error("Get user error: %s", e)
         return jsonify({"error": str(e)}), 500
     finally:
-        try:
-            cursor.close(); conn.close()
-        except:
-            pass
+        cursor.close()
+        conn.close()
 
+
+# ---------------- UPDATE USER (PUT) ----------------
+@app.route("/user/<int:user_id>", methods=["PUT"])
 def update_user(user_id):
     data = request.get_json(silent=True) or {}
-    name = data.get("name")
-    phone = data.get("phone")
 
+    updates = []
     params = []
-    if name is not None:
-        updates.append("name=%s"); params.append(name)
-        updates.append("email=%s"); params.append(email)
-    if phone is not None:
-        updates.append("phone=%s"); params.append(phone)
-        pw_hash = generate_password_hash(password)
-        updates.append("password_hash=%s"); params.append(pw_hash)
+
+    if data.get("name"):
+        updates.append("name=%s")
+        params.append(data["name"])
+
+    if data.get("email"):
+        updates.append("email=%s")
+        params.append(data["email"])
+
+    if data.get("phone"):
+        updates.append("phone=%s")
+        params.append(data["phone"])
+
+    if data.get("password"):
+        pw_hash = generate_password_hash(data["password"])
+        updates.append("password_hash=%s")
+        params.append(pw_hash)
+
     if not updates:
         return jsonify({"error": "no fields to update"}), 400
 
     params.append(user_id)
+
     sql = "UPDATE users SET " + ", ".join(updates) + " WHERE id=%s"
+
     try:
         conn = get_db_connection()
+        cursor = conn.cursor()
         cursor.execute(sql, tuple(params))
         conn.commit()
+
         if cursor.rowcount == 0:
             return jsonify({"error": "user not found"}), 404
+
         log_action(user_id, "update")
         return jsonify({"status": "updated", "id": user_id})
     except Error as e:
-        app.logger.error("Update error: %s", e)
         return jsonify({"error": str(e)}), 500
     finally:
-        try:
-            cursor.close(); conn.close()
-        except:
-            pass
+        cursor.close()
+        conn.close()
 
-# Delete user
+
+# ---------------- DELETE USER ----------------
 @app.route("/user/<int:user_id>", methods=["DELETE"])
 def delete_user(user_id):
     try:
@@ -217,20 +246,20 @@ def delete_user(user_id):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM users WHERE id=%s", (user_id,))
         conn.commit()
+
         if cursor.rowcount == 0:
             return jsonify({"error": "user not found"}), 404
+
         log_action(user_id, "delete")
         return jsonify({"status": "deleted", "id": user_id})
     except Error as e:
-        app.logger.error("Delete error: %s", e)
         return jsonify({"error": str(e)}), 500
     finally:
-        try:
-            cursor.close(); conn.close()
-        except:
-            pass
+        cursor.close()
+        conn.close()
 
-# List users with pagination and search
+
+# ---------------- LIST USERS ----------------
 @app.route("/users", methods=["GET"])
 def list_users():
     try:
@@ -240,11 +269,12 @@ def list_users():
         return jsonify({"error": "invalid pagination params"}), 400
 
     search = (request.args.get("search") or "").strip()
-
     offset = (page - 1) * limit
+
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
+
         if search:
             like = f"%{search}%"
             cursor.execute(
@@ -256,9 +286,9 @@ def list_users():
                 "SELECT id, name, email, phone, created_at FROM users ORDER BY id DESC LIMIT %s OFFSET %s",
                 (limit, offset)
             )
+
         rows = cursor.fetchall()
 
-        # total count (for client to know total pages)
         if search:
             cursor.execute("SELECT COUNT(*) as cnt FROM users WHERE name LIKE %s OR email LIKE %s", (like, like))
         else:
@@ -267,15 +297,13 @@ def list_users():
 
         return jsonify({"page": page, "limit": limit, "total": total, "users": rows})
     except Error as e:
-        app.logger.error("List users error: %s", e)
         return jsonify({"error": str(e)}), 500
     finally:
-        try:
-            cursor.close(); conn.close()
-        except:
-            pass
+        cursor.close()
+        conn.close()
 
-# View logs (simple)
+
+# ---------------- VIEW LOGS ----------------
 @app.route("/logs", methods=["GET"])
 def view_logs():
     try:
@@ -285,23 +313,12 @@ def view_logs():
         rows = cursor.fetchall()
         return jsonify(rows)
     except Error as e:
-        app.logger.error("Logs error: %s", e)
         return jsonify({"error": str(e)}), 500
     finally:
-        try:
-            cursor.close(); conn.close()
-        except:
-            pass
+        cursor.close()
+        conn.close()
 
+
+# ---------------- MAIN ----------------
 if __name__ == "__main__":
-    # for local dev; in docker we use gunicorn
     app.run(host="0.0.0.0", port=5000)
-        cursor = conn.cursor()
-
-    if password is not None and password != "":
-    if email is not None:
-    updates = []
-    password = data.get("password")
-    email = data.get("email")
-@app.route("/user/<int:user_id>", methods=["PUT"])
-
