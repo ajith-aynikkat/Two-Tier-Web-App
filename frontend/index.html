@@ -4,160 +4,263 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Two-Tier Web App</title>
+
+    <!-- Feather Icons -->
+    <script src="https://unpkg.com/feather-icons"></script>
+
     <style>
+        :root {
+            --bg: #f4f6f9;
+            --bg-dark: #0d1117;
+            --text: #1e1e1e;
+            --text-dark: #e6e6e6;
+            --card: #ffffff;
+            --card-dark: #161b22;
+            --primary: #1e88e5;
+            --primary-dark: #3ea6ff;
+        }
+
         body {
             font-family: Arial, sans-serif;
-            background: #f4f6f9;
             margin: 0;
             padding: 0;
+            display: flex;
+            background: var(--bg);
+            color: var(--text);
+            transition: background 0.3s ease, color 0.3s ease;
         }
+        body.dark {
+            background: var(--bg-dark);
+            color: var(--text-dark);
+        }
+
         header {
-            background: #1e88e5;
+            background: var(--primary);
             padding: 20px;
             text-align: center;
             color: white;
             font-size: 24px;
             font-weight: bold;
+            width: 100%;
         }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 70px;
+            background: #1e1e1e;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            padding-top: 30px;
+            transition: 0.2s;
+            overflow: hidden;
+        }
+        .sidebar:hover {
+            width: 220px;
+        }
+        .menu-item {
+            color: white;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: 0.2s;
+            opacity: 0.8;
+        }
+        .menu-item:hover {
+            opacity: 1;
+            background: #333;
+            transform: scale(1.03);
+        }
+        .menu-item i {
+            margin-right: 15px;
+        }
+
+        /* MAIN */
+        #mainContent {
+            margin-left: 70px;
+            padding: 20px;
+            width: calc(100% - 70px);
+            transition: 0.2s;
+        }
+        .sidebar:hover + #mainContent {
+            margin-left: 220px;
+            width: calc(100% - 220px);
+        }
+
         .container {
             width: 100%;
-            max-width: 400px;
+            max-width: 450px;
             margin: 40px auto;
-            background: white;
+            background: var(--card);
             padding: 25px;
             border-radius: 12px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            transition: background 0.3s ease;
         }
-        h2 {
-            text-align: center;
+        body.dark .container {
+            background: var(--card-dark);
         }
-        input {
+
+        input, button {
             width: 100%;
             padding: 12px;
             margin: 10px 0;
-            border: 1px solid #ccc;
             border-radius: 8px;
+            border: 1px solid #ccc;
+            transition: 0.2s;
         }
         button {
-            width: 100%;
-            padding: 12px;
-            background: #1e88e5;
+            background: var(--primary);
             color: white;
             border: none;
-            border-radius: 8px;
             cursor: pointer;
-            font-size: 16px;
-            margin-top: 10px;
         }
         button:hover {
-            background: #1565c0;
+            background: var(--primary-dark);
+            transform: scale(1.02);
         }
-        .switch {
-            text-align: center;
-            margin-top: 15px;
+
+        .section { display:none; }
+
+        /* Toast */
+        #toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #323232;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 6px;
+            opacity: 0;
+            transform: translateY(50px);
+            pointer-events: none;
+            transition: 0.4s;
         }
-        .switch a {
-            color: #1e88e5;
-            text-decoration: none;
+        #toast.show {
+            opacity: 1;
+            transform: translateY(0);
         }
-        .message {
-            text-align: center;
-            margin-top: 15px;
-            color: green;
-            font-weight: bold;
-        }
-        .error {
-            text-align: center;
-            margin-top: 15px;
-            color: red;
-            font-weight: bold;
+
+        /* Dark mode toggle */
+        .dark-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--primary);
+            padding: 10px 15px;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
-    <header>Two-Tier Web App</header>
 
-    <div class="container" id="authBox">
-        <h2 id="formTitle">Login</h2>
-
-        <input type="email" id="email" placeholder="Email" />
-        <input type="password" id="password" placeholder="Password" />
-
-        <div id="extraFields" style="display:none;">
-            <input type="text" id="name" placeholder="Full Name" />
-            <input type="text" id="phone" placeholder="Phone" />
-        </div>
-
-        <button id="submitBtn" onclick="submitForm()">Login</button>
-
-        <div class="switch">
-            <a href="#" onclick="toggleForm()" id="switchText">Don't have an account? Register</a>
-        </div>
-
-        <div id="responseMsg"></div>
+    <div class="sidebar" id="sidebar" style="display:none;">
+        <div class="menu-item" onclick="showSection('dashboard')"><i data-feather="home"></i><span>Dashboard</span></div>
+        <div class="menu-item" onclick="openProfile()"><i data-feather="user"></i><span>Profile</span></div>
+        <div class="menu-item" onclick="openEditProfile()"><i data-feather="edit"></i><span>Edit</span></div>
+        <div class="menu-item" onclick="openChangePassword()"><i data-feather="lock"></i><span>Password</span></div>
+        <div class="menu-item" onclick="deleteAccount()"><i data-feather="trash-2"></i><span>Delete</span></div>
+        <div class="menu-item" onclick="logout()"><i data-feather="log-out"></i><span>Logout</span></div>
     </div>
 
-    <script>
-        let isLogin = true;
-        const API_BASE = "http://13.203.30.7:5001";
+    <div id="mainContent">
+        <header>Two-Tier Web App</header>
+        <div class="dark-toggle" onclick="toggleDarkMode()">🌙</div>
 
-        function toggleForm() {
-            isLogin = !isLogin;
-            document.getElementById("formTitle").innerText = isLogin ? "Login" : "Register";
-            document.getElementById("submitBtn").innerText = isLogin ? "Login" : "Register";
-            document.getElementById("switchText").innerText = isLogin ? "Don't have an account? Register" : "Already have an account? Login";
-            document.getElementById("extraFields").style.display = isLogin ? "none" : "block";
-            document.getElementById("responseMsg").innerHTML = "";
+        <!-- AUTH -->
+        <div class="container" id="authBox">
+            <h2 id="formTitle">Login</h2>
+            <input type="email" id="email" placeholder="Email" />
+            <input type="password" id="password" placeholder="Password" />
+            <div id="extraFields" style="display:none;"><input type="text" id="name" placeholder="Full Name" /><input type="text" id="phone" placeholder="Phone" /></div>
+            <button onclick="submitForm()" id="submitBtn">Login</button>
+            <p class="switch"><a href="#" onclick="toggleForm()" id="switchText">Don't have an account? Register</a></p>
+            <div id="responseMsg"></div>
+        </div>
+
+        <!-- DASHBOARD -->
+        <div id="dashboard" class="section" style="text-align:center;"><h2>Welcome, <span id="welcomeUser"></span> 👋</h2></div>
+
+        <!-- PROFILE -->
+        <div id="profilePage" class="section" style="text-align:center;"><h2>Your Profile</h2><p><strong>Name:</strong> <span id="profName"></span></p><p><strong>Email:</strong> <span id="profEmail"></span></p><p><strong>Phone:</strong> <span id="profPhone"></span></p></div>
+
+        <!-- EDIT PROFILE -->
+        <div id="editProfilePage" class="section container"><h2>Edit Profile</h2><input type="text" id="editName" /><input type="text" id="editPhone" /><button onclick="saveProfile()">Save</button></div>
+
+        <!-- CHANGE PASSWORD -->
+        <div id="changePasswordPage" class="section container"><h2>Change Password</h2><input type="password" id="oldPw" placeholder="Old Password" /><input type="password" id="newPw" placeholder="New Password" /><button onclick="savePassword()">Update Password</button></div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast"></div>
+
+<script>
+    feather.replace();
+    const API_BASE = "http://13.203.30.7:5001";
+
+    function toast(msg){
+        const t=document.getElementById("toast");
+        t.innerText=msg;
+        t.classList.add("show");
+        setTimeout(()=>t.classList.remove("show"),3000);
+    }
+
+    function toggleDarkMode(){
+        document.body.classList.toggle("dark");
+    }
+
+    function showSection(id){
+        document.querySelectorAll('.section').forEach(s=>s.style.display='none');
+        document.getElementById(id).style.display='block';
+    }
+
+    function toggleForm(){
+        isLogin = !isLogin;
+        document.getElementById("formTitle").innerText = isLogin ? "Login":"Register";
+        document.getElementById("submitBtn").innerText = isLogin ? "Login":"Register";
+        document.getElementById("switchText").innerText = isLogin ? "Don't have an account? Register":"Already have an account? Login";
+        document.getElementById("extraFields").style.display = isLogin ? "none":"block";
+    }
+
+    async function post(path, body){
+        const token = localStorage.getItem("token");
+        try{
+            let res = await fetch(API_BASE + path,{
+                method:"POST",
+                headers:{"Content-Type":"application/json", ...(token?{"Authorization":"Bearer "+token}:{})},
+                body: JSON.stringify(body)
+            });
+            let data = await res.json();
+            if(!res.ok){ toast(data.error); return null; }
+            return data;
+        }catch(e){ toast("Network error"); return null; }
+    }
+
+    async function submitForm(){
+        const email=document.getElementById("email").value;
+        const password=document.getElementById("password").value;
+        if(!email||!password) return toast("Email & password required");
+
+        if(!isLogin){
+            const name=document.getElementById("name").value;
+            const phone=document.getElementById("phone").value;
+            let r=await post("/register",{name,email,phone,password});
+            if(r) toast("Registered! Please login.");
+            return;
         }
 
-        async function submitForm() {
-            const email = document.getElementById("email").value;
-            const password = document.getElementById("password").value;
+        let r=await post("/login",{email,password});
+        if(r){ localStorage.setItem("token",r.token); localStorage.setItem("user",JSON.stringify(r.user)); loadDashboard(); }
+    }
 
-            if (!email || !password) {
-                showError("Email & password required");
-                return;
-            }
-
-            if (!isLogin) {
-                const name = document.getElementById("name").value;
-                const phone = document.getElementById("phone").value;
-
-                if (!name) return showError("Name is required");
-
-                const res = await apiRequest("/register", {
-                    name, email, phone, password
-                });
-                return;
-            }
-
-            const res = await apiRequest("/login", { email, password });
-        }
-
-        async function apiRequest(path, body) {
-            try {
-                const res = await fetch(API_BASE + path, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(body)
-                });
-                const data = await res.json();
-
-                if (!res.ok) return showError(data.error || "Request failed");
-
-                showSuccess(JSON.stringify(data));
-            } catch (err) {
-                showError("Network error: " + err);
-            }
-        }
-
-        function showSuccess(msg) {
-            document.getElementById("responseMsg").innerHTML = `<p class='message'>${msg}</p>`;
-        }
-
-        function showError(msg) {
-            document.getElementById("responseMsg").innerHTML = `<p class='error'>${msg}</p>`;
-        }
-    </script>
-</body>
-</html>
+    function loadDashboard(){
+        const user=JSON.parse(localStorage.getItem("user"));
+        document.getElementById("authBox").style.display="none";
+        document.getElementById("sidebar").style.display="block";
+        document.getElementById("welcomeUser").innerText=user.name;
+        showSection('dashboard');
+    }
