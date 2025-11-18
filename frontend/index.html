@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Two-Tier Web App - Frontend</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 24px; max-width: 800px; margin: auto; }
+      input, button { padding: 8px; font-size: 16px; }
+      ul { margin-top: 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>Two-Tier Web App</h1>
+    <p>Flask API running on <strong>port 5000</strong>.</p>
+
+    <div>
+      <label>Create user: </label>
+      <input id="name" placeholder="Name" />
+      <button onclick="createUser()">Create</button>
+    </div>
+
+    <div>
+      <h3>Users</h3>
+      <button onclick="loadUsers()">Refresh</button>
+      <ul id="users"></ul>
+    </div>
+
+    <script>
+      const API = location.origin.includes('http') ? (location.protocol + '//' + location.hostname + ':5000') : 'http://localhost:5000';
+
+      async function loadUsers() {
+        try {
+          const r = await fetch(API + '/users');
+          const list = await r.json();
+          const el = document.getElementById('users');
+          el.innerHTML = list.map(u => `<li>${u.id} — ${u.name}</li>`).join('');
+        } catch (e) {
+          alert('Failed to load users. Is the backend running on port 5000?');
+        }
+      }
+
+      async function createUser() {
+        const name = document.getElementById('name').value || 'anonymous';
+        await fetch(API + '/create_user', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name})
+        });
+        document.getElementById('name').value = '';
+        await loadUsers();
+      }
+
+      // initial load
+      loadUsers();
+    </script>
+  </body>
+</html>
