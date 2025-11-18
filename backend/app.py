@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, g
+from flask_cors import CORS
 import os
 import mysql.connector
 from mysql.connector import Error, pooling
@@ -8,6 +9,7 @@ from functools import wraps
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
+CORS(app)
 
 # Config
 DB_HOST = os.getenv("MYSQL_HOST", "db")
