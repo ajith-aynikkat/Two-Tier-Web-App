@@ -1,56 +1,163 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta charset="utf-8" />
-<title>Two-Tier Web App - Frontend</title>
-<style>
-  body { font-family: Arial, sans-serif; padding: 24px; max-width: 800px; margin: auto; }
-  input, button { padding: 8px; font-size: 16px; }
-  ul { margin-top: 12px; }
-</style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Two-Tier Web App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background: #1e88e5;
+            padding: 20px;
+            text-align: center;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .container {
+            width: 100%;
+            max-width: 400px;
+            margin: 40px auto;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #1e88e5;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #1565c0;
+        }
+        .switch {
+            text-align: center;
+            margin-top: 15px;
+        }
+        .switch a {
+            color: #1e88e5;
+            text-decoration: none;
+        }
+        .message {
+            text-align: center;
+            margin-top: 15px;
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            text-align: center;
+            margin-top: 15px;
+            color: red;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
-<h1>Two-Tier Web App</h1>
-<p>Flask API running on <strong>port 5001</strong>.</p>
+    <header>Two-Tier Web App</header>
 
-<div>
-  <label>Create user: </label>
-  <input id="name" placeholder="Name" />
-  <button onclick="createUser()">Create</button>
-</div>
+    <div class="container" id="authBox">
+        <h2 id="formTitle">Login</h2>
 
-<div>
-  <h3>Users</h3>
-  <button onclick="loadUsers()">Refresh</button>
-  <ul id="users"></ul>
-</div>
+        <input type="email" id="email" placeholder="Email" />
+        <input type="password" id="password" placeholder="Password" />
 
-<script>
-  const API = location.protocol + '//' + location.hostname + ':5001';
+        <div id="extraFields" style="display:none;">
+            <input type="text" id="name" placeholder="Full Name" />
+            <input type="text" id="phone" placeholder="Phone" />
+        </div>
 
-  async function loadUsers() {
-    try {
-      const r = await fetch(API + '/users');
-      const list = await r.json();
-      const el = document.getElementById('users');
-      el.innerHTML = list.map(u => `<li>${u.id} — ${u.name}</li>`).join('');
-    } catch (e) {
-      alert('Failed to load users. Is the backend running on port 5001?');
-    }
-  }
+        <button id="submitBtn" onclick="submitForm()">Login</button>
 
-  async function createUser() {
-    const name = document.getElementById('name').value || 'anonymous';
-    await fetch(API + '/create_user', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({name})
-    });
-    document.getElementById('name').value = '';
-    await loadUsers();
-  }
+        <div class="switch">
+            <a href="#" onclick="toggleForm()" id="switchText">Don't have an account? Register</a>
+        </div>
 
-  loadUsers();
-</script>
+        <div id="responseMsg"></div>
+    </div>
+
+    <script>
+        let isLogin = true;
+        const API_BASE = "http://13.203.30.7:5001";
+
+        function toggleForm() {
+            isLogin = !isLogin;
+            document.getElementById("formTitle").innerText = isLogin ? "Login" : "Register";
+            document.getElementById("submitBtn").innerText = isLogin ? "Login" : "Register";
+            document.getElementById("switchText").innerText = isLogin ? "Don't have an account? Register" : "Already have an account? Login";
+            document.getElementById("extraFields").style.display = isLogin ? "none" : "block";
+            document.getElementById("responseMsg").innerHTML = "";
+        }
+
+        async function submitForm() {
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+
+            if (!email || !password) {
+                showError("Email & password required");
+                return;
+            }
+
+            if (!isLogin) {
+                const name = document.getElementById("name").value;
+                const phone = document.getElementById("phone").value;
+
+                if (!name) return showError("Name is required");
+
+                const res = await apiRequest("/register", {
+                    name, email, phone, password
+                });
+                return;
+            }
+
+            const res = await apiRequest("/login", { email, password });
+        }
+
+        async function apiRequest(path, body) {
+            try {
+                const res = await fetch(API_BASE + path, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+
+                if (!res.ok) return showError(data.error || "Request failed");
+
+                showSuccess(JSON.stringify(data));
+            } catch (err) {
+                showError("Network error: " + err);
+            }
+        }
+
+        function showSuccess(msg) {
+            document.getElementById("responseMsg").innerHTML = `<p class='message'>${msg}</p>`;
+        }
+
+        function showError(msg) {
+            document.getElementById("responseMsg").innerHTML = `<p class='error'>${msg}</p>`;
+        }
+    </script>
 </body>
 </html>
