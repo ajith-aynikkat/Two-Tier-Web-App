@@ -26,7 +26,8 @@
     </div>
 
     <script>
-      const API = location.origin.includes('http') ? (location.protocol + '//' + location.hostname + ':5000') : 'http://localhost:5000';
+      const API = location.protocol + '//' + location.hostname + ':5001';
+
 
       async function loadUsers() {
         try {
