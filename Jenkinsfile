@@ -6,7 +6,7 @@ pipeline {
     }
     stage('Unit tests') {
       steps {
-        dir('app') {
+        dir('backend') {
           sh 'python3 -m pip install --user -r requirements.txt || true'
           sh 'pytest -q || true'
         }
