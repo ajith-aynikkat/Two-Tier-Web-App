@@ -1,22 +1,49 @@
 pipeline {
-  agent any
-  stages {
-    stage('Checkout') {
-      steps { checkout scm }
+    agent any
+
+    environment {
+        SSH_CRED = 'ec2-deploy-key'
+        DEPLOY_USER = 'ubuntu'
+        DEPLOY_HOST = 'localhost'
+        APP_DIR = '/home/ubuntu/Two-Tier-Web-App'
     }
-    stage('Unit tests') {
-      steps {
-        dir('backend') {
-          sh 'python3 -m pip install --user -r requirements.txt || true'
-          sh 'pytest -q || true'
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
         }
-      }
+
+        stage('Build on Jenkins Server') {
+            steps {
+                echo "Nothing to build locally (Docker build will run on deploy server)"
+            }
+        }
+
+        stage('Deploy to EC2') {
+            steps {
+                sshagent([SSH_CRED]) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} '
+                            cd ${APP_DIR}
+                            git pull
+                            docker-compose down || true
+                            docker-compose up --build -d
+                        '
+                    """
+                }
+            }
+        }
     }
-    stage('Build & Deploy') {
-      steps {
-        sh 'docker compose -f docker-compose.yml build --no-cache'
-        sh 'docker compose -f docker-compose.yml up -d --remove-orphans --build'
-      }
+
+    post {
+        success {
+            echo "Deployment Successful!"
+        }
+        failure {
+            echo "Deployment Failed."
+        }
     }
-  }
 }
